@@ -1,0 +1,142 @@
+using UnityEngine;
+using UnityEngine.UI;
+using TMPro;
+using System.Collections.Generic;
+using UnityEngine.SceneManagement;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
+
+public class ScoreManager : MonoBehaviour
+{
+    public static ScoreManager Instance { get; private set; }
+
+    [SerializeField] private Image backgroundImage;
+    [SerializeField] private TextMeshProUGUI scoreText;
+    private PlayerHealth playerHealth;
+
+    private int playerScore = 0;
+    private HashSet<string> collectedRewards = new HashSet<string>();
+
+    private const string ScoreKey = "PlayerScore";
+    private const string RewardsKey = "CollectedRewards";
+
+    private void Awake()
+    {
+        if (Instance == null)
+        {
+            Instance = this;
+            DontDestroyOnLoad(gameObject);
+            LoadScore();
+            SceneManager.sceneLoaded += OnSceneLoaded;
+        }
+        else
+        {
+            Destroy(gameObject);
+        }
+    }
+
+    private void Start()
+    {
+        UpdateScoreDisplay();
+        playerHealth = FindObjectOfType<PlayerHealth>();
+    }
+
+    private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        UpdateScoreDisplay();
+    }
+
+    public void AddScore(int amount, string rewardId)
+    {
+        if (!collectedRewards.Contains(rewardId))
+        {
+            playerScore += amount;
+            collectedRewards.Add(rewardId);
+            UpdateScoreDisplay();
+            SaveScore();
+        }
+    }
+
+    public void SubtractScore(int amount, string rewardId)
+    {
+        if (!collectedRewards.Contains(rewardId))
+        {
+            playerScore -= amount;
+            collectedRewards.Add(rewardId);
+            UpdateScoreDisplay();
+            SaveScore();
+        }
+    }
+
+    private void UpdateScoreDisplay()
+    {
+        if (scoreText != null)
+        {
+            scoreText.text = playerScore.ToString();
+        }
+    }
+
+    public void SetBackgroundImage(Sprite sprite)
+    {
+        if (backgroundImage != null && sprite != null)
+        {
+            backgroundImage.sprite = sprite;
+        }
+    }
+
+    private void SaveScore()
+    {
+        PlayerPrefs.SetInt(ScoreKey, playerScore);
+        PlayerPrefs.SetString(RewardsKey, string.Join(",", collectedRewards));
+        PlayerPrefs.Save();
+    }
+
+    private void LoadScore()
+    {
+        playerScore = PlayerPrefs.GetInt(ScoreKey, 0);
+        string rewardsString = PlayerPrefs.GetString(RewardsKey, "");
+        collectedRewards = new HashSet<string>(rewardsString.Split(new char[] { ',' }, System.StringSplitOptions.RemoveEmptyEntries));
+    }
+
+    public void ResetGame()
+    {
+        playerScore = 0;
+        collectedRewards.Clear();
+        UpdateScoreDisplay();
+        SaveScore();
+    }
+
+    private void Update()
+    {
+        if (playerHealth == null)
+        {
+            playerHealth = FindObjectOfType<PlayerHealth>();
+            if (playerHealth != null)
+            {
+                UpdateScoreDisplay();
+            }
+        }
+    }
+
+    public void OnPlayerDeath()
+    {
+        ResetGame();
+    }
+
+    // New method to clear PlayerPrefs data
+    private void ClearPlayerPrefs()
+    {
+        PlayerPrefs.DeleteKey(ScoreKey);
+        PlayerPrefs.DeleteKey(RewardsKey);
+        PlayerPrefs.Save();
+    }
+
+#if UNITY_EDITOR
+    private void OnApplicationQuit()
+    {
+        ClearPlayerPrefs();
+        Debug.Log("Score and collected rewards have been reset.");
+    }
+#endif
+}
